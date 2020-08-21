@@ -27,7 +27,7 @@ from skimage.metrics import structural_similarity
 
 #=================截图比对区域=================#
 IMAGE_PATH = 'initial_IMG/'#读取截图的路径
-MAIN_MENU_IMAGE_BOX = [0.65,0.52,0.75,0.60]#主界面判断区域                       
+MAIN_MENU_IMAGE_BOX = [0.65,0.58,0.75,0.63]#主界面判断区域                       
 L_SUPPORT_IMAGE_BOX = [0.05,0.30,0.18,0.39]#后勤完成界面判断区域                
 COMBAT_MENU_IMAGE_BOX = [0.05,0.70,0.12,0.80]#战斗菜单界面判断区域         
 CHOOSE_0_2_IMAGE_BOX = [0.50,0.43,0.60,0.50]#0-2界面判断区域                          
@@ -48,10 +48,12 @@ RETURN_COMBAT_IMAGE_BOX = [0.75,0.63,0.90,0.70]#回到作战界面判断区域
 #=================点击拖动区域=================#
 
 #从主菜单进入作战选择界面
-COMBAT_CLICK_BOX = [0.65,0.50,0.75,0.58]#在主菜单点击战斗
+COMBAT_CLICK_BOX = [0.65,0.58,0.75,0.63]#在主菜单点击战斗（无作战进行中情况）
+#[0.65,0.58,0.75,0.63]
+COMBAT_ON_CLICK_BOX = [0.65,0.50,0.75,0.58]#在主菜单点击战斗（作战中断情况）
 
 #从作战选择界面进入0-2界面
-COMBAT_MISSION_CLICK_BOX = [0.05,0.26,0.10,0.30]#点击作战任务
+COMBAT_MISSION_CLICK_BOX = [0.05,0.18,0.10,0.22]#点击作战任务
 CHAPTER_DRAG_BOX = [0.16,0.35,0.22,0.40]#向上拖章节选择条
 CHAPTER_0_CLICK_BOX = [0.16,0.18,0.22,0.25]#选择第0章
 NORMAL_CLICK_BOX = [0.74,0.24,0.77,0.28]#选择普通难度
@@ -74,7 +76,8 @@ COMMAND_CLICK_BOX = [0.50,0.82,0.52,0.85]#指挥部
 #更换打手
 CHANGE_FORCE_STEP1_CLICK_BOX = [0.17,0.74,0.26,0.77]#点击梯队编成
 CHANGE_FORCE_STEP2_CLICK_BOX = [0.15,0.35,0.25,0.55]#点击1队打手
-CHANGE_FORCE_STEP3_CLICK_BOX = [0.20,0.25,0.25,0.40]#更换打手
+CHANGE_FORCE_STEP3_1_CLICK_BOX = [0.20,0.25,0.25,0.40]#更换打手1
+CHANGE_FORCE_STEP3_2_CLICK_BOX = [0.32,0.25,0.38,0.40]#更换打手2
 CHANGE_FORCE_STEP4_CLICK_BOX = [0.08,0.10,0.10,0.14]#点击返回
 
 #放置队伍
@@ -399,10 +402,15 @@ def isTeamInfo():
     capImage  = cv2.cvtColor(np.asarray(capImage),cv2.COLOR_RGB2BGR)
     return imageCompare(initImage,capImage)
 
-#从主菜单进入作战菜单
+#从主菜单进入作战菜单（无战斗进行中情况）
 def mainMenuToCombatMenu():
     print("ACTION: 前往作战菜单")
     mouseClick(COMBAT_CLICK_BOX,5,6)  
+
+#从主菜单进入作战菜单（战斗中断情况）
+def mainMenuToCombatMenu_combatOn():
+    print("ACTION: 前往作战菜单-战斗中断")
+    mouseClick(COMBAT_ON_CLICK_BOX,5,6)  
     
 #从作战菜单进入0-2界面
 def combatMenuTo0_2():
@@ -440,6 +448,10 @@ def adjustMap(tiny = False):
 def combatPrepare():
     print("STATE: 战前整备")
     adjustMap()
+    #
+    changeForce(False)
+    #
+    adjustMap(True)
     if not setTeam():
         return False
     if not startCombat():
@@ -456,7 +468,7 @@ def restartCombat():
     mouseClick(RESTART_STEP2_CLICK_BOX,8,8)
 
 #更换打手
-def changeForce():
+def changeForce(teamFlag):
     print("ACTION: 更换打手")
     mouseClick(AIRPORT_CLICK_BOX,0,0)#点击机场
     checkCount = 0
@@ -482,7 +494,10 @@ def changeForce():
     if checkCount >= 20:
         return False
     time.sleep(0.4)
-    mouseClick(CHANGE_FORCE_STEP3_CLICK_BOX,0,0)#更换打手
+    if teamFlag:
+        mouseClick(CHANGE_FORCE_STEP3_2_CLICK_BOX,0,0)#更换打手
+    else:
+        mouseClick(CHANGE_FORCE_STEP3_1_CLICK_BOX,0,0)#更换打手
     checkCount = 0
     while not isFormTeam() and checkCount < 20:
         time.sleep(0.4)
@@ -705,6 +720,7 @@ if __name__ == "__main__":
     combatCount = 0
     firstCombat = True
     failCount = 0
+    teamFlag = True#Flag为True时选第二只，为False时选第一只
 
     while True:
         if isInMap():
@@ -712,12 +728,13 @@ if __name__ == "__main__":
             failCount = 0
             if firstCombat:#战前准备
                 firstCombat = False
+                teamFlag = True
                 if not combatPrepare():
                     closeGame()
                 continue
             else:
                 adjustMap(True)
-            if not changeForce():#更换打手
+            if not changeForce(teamFlag):#更换打手
                 print("ERROR：更换打手失败")
                 closeGame()
                 continue
@@ -753,6 +770,7 @@ if __name__ == "__main__":
                 closeGame()
                 continue
             combatCount += 1
+            teamFlag = (not teamFlag)
             currentTime = datetime.datetime.now()
             runtime = currentTime - startTime
             print('> 已运行：',runtime,'  0-2轮次：',combatCount)                
@@ -777,7 +795,7 @@ if __name__ == "__main__":
         elif isReturnCombat():
             print("STATE： 返回作战界面")
             failCount = 0
-            mainMenuToCombatMenu()
+            mainMenuToCombatMenu_combatOn()
             combatMenuTo0_2()
             end0_2()
             firstCombat = True
